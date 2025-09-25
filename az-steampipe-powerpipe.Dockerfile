@@ -1,6 +1,9 @@
 # Built image - https://hub.docker.com/r/okpalindrome/az-steampipe-powerpipe
+
+# rename this file from az-steampipe-powerpipe.Dockerfile to Dockerfile
+# docker build -t test:1 . 
 # docker run -it --rm -p 9033:9033 test:1 /bin/bash
-# Start Steampipe as the data source cmd (it will download and install db): steampipe service start
+# Start Steampipe as the data source cmd: steampipe service start
 # Start the dashboard server cmd: powerpipe server --listen network
 
 FROM ubuntu:24.04
@@ -37,6 +40,8 @@ RUN steampipe plugin install azure azuread && mkdir dashboards
 WORKDIR /home/steampipeuser/dashboards
 
 RUN powerpipe mod init && powerpipe mod install github.com/turbot/steampipe-mod-azure-compliance 
+
+RUN /bin/sh -c "$(curl -fsSL https://steampipe.io/install/postgres.sh)"
 
 # Expose Powerpipe dashboard port
 EXPOSE 9033
