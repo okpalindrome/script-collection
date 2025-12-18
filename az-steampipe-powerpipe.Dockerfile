@@ -1,50 +1,62 @@
-# Built image - https://hub.docker.com/r/okpalindrome/az-steampipe-powerpipe
-
-# rename this file from az-steampipe-powerpipe.Dockerfile to Dockerfile
-# docker build -t test:1 . 
-# docker run -it --rm -p 9033:9033 test:1 /bin/bash
-# Start Steampipe as the data source cmd: steampipe service start
-# Start the dashboard server cmd: powerpipe server --listen network
-
 FROM ubuntu:24.04
 
-# Install dependencies for az-cli
-RUN apt-get update && apt-get install -y apt-transport-https ca-certificates git curl gnupg lsb-release
+# Prevent interactive prompts during installation
+ENV DEBIAN_FRONTEND=noninteractive
 
-# Add Microsoft key and repository for az-cli
-RUN mkdir -p /etc/apt/keyrings && \
-    curl -sLS https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor | tee /etc/apt/keyrings/microsoft.gpg > /dev/null && \
-    chmod go+r /etc/apt/keyrings/microsoft.gpg
+# Update packages and install required dependencies
+RUN apt-get update && \
+    apt-get install -y \
+    sudo \
+    curl \
+    gnupg \
+    lsb-release \
+    ca-certificates \
+    apt-transport-https && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
-# Add az-cli source list
-RUN AZ_DIST=$(lsb_release -cs) && \
-    echo "Types: deb\nURIs: https://packages.microsoft.com/repos/azure-cli/\nSuites: ${AZ_DIST}\nComponents: main\nArchitectures: $(dpkg --print-architecture)\nSigned-by: /etc/apt/keyrings/microsoft.gpg" | tee /etc/apt/sources.list.d/azure-cli.sources
+# Install Azure CLI
+RUN curl -sL https://aka.ms/InstallAzureCLIDeb | bash
 
-# Install steampipe
-RUN /bin/sh -c "$(curl -fsSL https://steampipe.io/install/steampipe.sh)"
+# Create user 'steampipeuser' with home directory
+RUN useradd -m -s /bin/bash steampipeuser
 
-# Install Powerpipe
-RUN /bin/sh -c "$(curl -fsSL https://powerpipe.io/install/powerpipe.sh)"
+# Add user to sudo group
+RUN usermod -aG sudo steampipeuser
 
-# Create a non-root user and set up the environment
-RUN useradd -m -s /bin/bash steampipeuser && \
-    chown -R steampipeuser:steampipeuser /home/steampipeuser
+# Allow sudo without password
+RUN echo "steampipeuser ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
-# Switch to the non-root user
+# Switch to the new user
 USER steampipeuser
+
+# Set working directory to user's home
 WORKDIR /home/steampipeuser
 
-# Install Steampipe Azure plugin and Azure compliance mod (includes CIS, NIST, etc.)
-RUN steampipe plugin install azure azuread && mkdir dashboards
+# Install Powerpipe and Steampipe
+RUN sudo /bin/sh -c "$(curl -fsSL https://powerpipe.io/install/powerpipe.sh)"
+RUN sudo /bin/sh -c "$(curl -fsSL https://steampipe.io/install/steampipe.sh)"
 
+# Install plugins
+RUN steampipe plugin install azure
+RUN steampipe plugin install azuread
+
+# Create dashboards directory and initialize
+RUN mkdir -p /home/steampipeuser/dashboards
 WORKDIR /home/steampipeuser/dashboards
 
-RUN powerpipe mod init && powerpipe mod install github.com/turbot/steampipe-mod-azure-compliance 
+RUN powerpipe mod init
+RUN powerpipe mod install github.com/turbot/steampipe-mod-azure-compliance
 
-RUN /bin/sh -c "$(curl -fsSL https://steampipe.io/install/postgres.sh)"
+# Create entrypoint script
+RUN echo '#!/bin/bash\n\
+steampipe service start\n\
+echo "Steampipe service started..."\n\
+exec "$@"' > /home/steampipeuser/entrypoint.sh && \
+    chmod +x /home/steampipeuser/entrypoint.sh
 
-# Expose Powerpipe dashboard port
-EXPOSE 9033
+# Set entrypoint
+ENTRYPOINT ["/home/steampipeuser/entrypoint.sh"]
 
-# Default command for interactive shell
-CMD ["/bin/bash"]
+# Default command (keeps container running)
+CMD ["/bin/bash", "-c", "tail -f /dev/null"]
