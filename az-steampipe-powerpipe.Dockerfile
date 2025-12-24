@@ -1,5 +1,10 @@
 FROM ubuntu:24.04
 
+# Versions
+# steampipe v2.3.4
+# powerpipe v1.4.2
+# with azure, aws, gcp compliance modules for security scanning
+
 # Prevent interactive prompts during installation
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -40,6 +45,8 @@ RUN sudo /bin/sh -c "$(curl -fsSL https://steampipe.io/install/steampipe.sh)"
 # Install plugins
 RUN steampipe plugin install azure
 RUN steampipe plugin install azuread
+RUN steampipe plugin install aws
+RUN steampipe plugin install gcp
 
 # Create dashboards directory and initialize
 RUN mkdir -p /home/steampipeuser/dashboards
@@ -47,8 +54,10 @@ WORKDIR /home/steampipeuser/dashboards
 
 RUN powerpipe mod init
 RUN powerpipe mod install github.com/turbot/steampipe-mod-azure-compliance
+RUN powerpipe mod install github.com/turbot/steampipe-mod-aws-compliance
+RUN powerpipe mod install github.com/turbot/steampipe-mod-gcp-compliance
 
-# Create entrypoint script
+# the entrypoint script
 RUN echo '#!/bin/bash\n\
 steampipe service start\n\
 echo "Steampipe service started..."\n\
